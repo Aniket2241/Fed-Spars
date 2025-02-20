@@ -242,7 +242,7 @@ if __name__ == "__main__":
         frac_eval_clients = 0.3
     elif args.dataset_name=="brain":
         model=models.create_model("brain", "CNN500k")
-        train_loaders, test_loaders = data.brain_data(path_to_data_folder="/content/Federated-Learning-Sparsification/brain dataset", num_clients=10)
+        train_loaders, test_loaders = data.brain_data(path_to_data_folder="/content/fedavg/brain", num_clients=10)
         frac_clients = 0.3
         frac_eval_clients = 0.3
     

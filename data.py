@@ -5,7 +5,7 @@ import random
 import numpy as np
 
 
-def brain_data(path_to_data_folder="/content/Federated-Learning-Sparsification/brain dataset", num_clients=10, train_split=0.8):
+def brain_data(path_to_data_folder="/content/fedavg/", num_clients=10, train_split=0.8):
     """
     Load custom brain tumor dataset and partition it into `num_clients` clients.
     Assumes directory structure:
