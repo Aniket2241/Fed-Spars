@@ -323,7 +323,7 @@ if __name__ == "__main__":
                             "learning_rate": [args.learning_rate], 
                             "regularisation": [args.regularisation],
                             "losses": [history.losses_distributed],
-                            
+                            "alpha":[args.dirichlet_alpha],
                             "accs": [history.metrics_distributed["accuracy"]],
                            })
     if os.path.isfile("results/results.csv"): 
