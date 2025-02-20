@@ -10,26 +10,33 @@ import argparse
 import os
 from datetime import datetime
 from collections import OrderedDict
-    
-def main(dataset_name,
-         femnist_location,
-         optimiser,
-         learning_rate):
-        
-    if dataset_name=="femnist":
+
+os.chdir("/content/Federated-Learning-Sparsification/")
+def main(dataset_name, femnist_location, optimiser, learning_rate, num_clients):
+    if dataset_name == "femnist":
         model = models.create_model(dataset_name, "CNN500k")
         num_rounds = 30
         client_frac = 0.25
         min_clients = 12
         trainloaders, testloaders = data.femnist_data(femnist_location)
 
-    else: # if dataset_name=="cifar":
+    elif dataset_name == "cifar":
         model = models.create_model(dataset_name, "CNN500k")
         num_rounds = 180
         client_frac = 0.3
         min_clients = 15
         trainloaders, testloaders = data.cifar_data()
-    
+
+    elif dataset_name == "brain":
+        model = models.create_model(dataset_name, "resnet18")
+        num_rounds = 30  # Adjust based on your needs
+        client_frac = 1.0  # Since you might have fewer clients
+        min_clients = num_clients  # Use all clients if few
+        trainloaders, testloaders = data.brain_data(path_to_data_folder="brain_dataset", num_clients=num_clients)
+
+    else:
+        raise ValueError("Unsupported dataset. Choose from 'femnist', 'cifar', 'brain'.")
+
     class FlowerClient(fl.client.NumPyClient):
         def __init__(self, cid, net, trainloader, testloader):
             self.cid = cid
@@ -65,52 +72,52 @@ def main(dataset_name,
         accuracies = [num_examples * m["accuracy"] for num_examples, m in metrics]
         examples = [num_examples for num_examples, _ in metrics]
         return {"accuracy": sum(accuracies) / sum(examples)}
-    
+
     strategy = fl.server.strategy.FedAvg(
-    fraction_fit=client_frac,
-    fraction_evaluate=client_frac,
-    min_fit_clients=min_clients,
-    min_evaluate_clients=min_clients,
-    min_available_clients=50,
-    evaluate_metrics_aggregation_fn=weighted_average,
-    initial_parameters=fl.common.ndarrays_to_parameters([val.cpu().numpy() for _, val in model.state_dict().items()]),
+        fraction_fit=client_frac,
+        fraction_evaluate=client_frac,
+        min_fit_clients=min_clients,
+        min_evaluate_clients=min_clients,
+        min_available_clients=num_clients,
+        evaluate_metrics_aggregation_fn=weighted_average,
+        initial_parameters=fl.common.ndarrays_to_parameters([val.cpu().numpy() for _, val in model.state_dict().items()]),
     )
 
     start = datetime.now()
     history = fl.simulation.start_simulation(
-    client_fn=client_fn,
-    num_clients=50,
-    config=fl.server.ServerConfig(num_rounds=num_rounds),
-    strategy=strategy,
-    client_resources={"num_gpus": 1, "num_cpus": 1},
+        client_fn=client_fn,
+        num_clients=num_clients,
+        config=fl.server.ServerConfig(num_rounds=num_rounds),
+        strategy=strategy,
+        client_resources={"num_gpus": 0.5, "num_cpus": 1},
     )
     end = datetime.now()
-    time_taken = end-start
-    
-    results = pd.DataFrame({"time_taken": [time_taken],
-                            "dataset": [dataset_name], 
-                            "num_rounds": [num_rounds],
-                            "approach": ["FedAvg"],
-                            "optimiser": [optimiser],
-                            "learning_rate": [learning_rate], 
-                            "losses": [history.losses_distributed],
-                            "accs": [history.metrics_distributed["accuracy"]],
-                           })
-    if os.path.isfile("results/fedavg_results.csv"): 
+    time_taken = end - start
+
+    results = pd.DataFrame({
+        "time_taken": [time_taken],
+        "dataset": [dataset_name],
+        "num_rounds": [num_rounds],
+        "approach": ["FedAvg"],
+        "optimiser": [optimiser],
+        "learning_rate": [learning_rate],
+        "losses": [history.losses_distributed],
+        "accs": [history.metrics_distributed["accuracy"]],
+    })
+
+    if os.path.isfile("results/fedavg_results.csv"):
         results.to_csv("results/fedavg_results.csv", mode="a", index=False, header=False)
     else:
         results.to_csv("results/fedavg_results.csv", mode="a", index=False, header=True)
-    
+
+
 if __name__ == "__main__":
-    
     parser = argparse.ArgumentParser(description="Simulate FedAvg")
     parser.add_argument("--dataset_name", required=True)
     parser.add_argument("--femnist_location", default="femnist_data")
     parser.add_argument("--optimiser", default="SGD")
     parser.add_argument("--learning_rate", default=0.1, type=float)
+    parser.add_argument("--num_clients", default=10, type=int)
     args = parser.parse_args()
-    
-    main(args.dataset_name,
-         args.femnist_location,
-         args.optimiser,
-         args.learning_rate)
+
+    main(args.dataset_name, args.femnist_location, args.optimiser, args.learning_rate, args.num_clients)

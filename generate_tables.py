@@ -39,5 +39,5 @@ def goal_accuracy_table():
 
     top = size_results.sort_values("bytes_communicated").groupby(["dataset", "accuracy_reached"]).head(1).sort_values(["dataset", "accuracy_reached"]).reset_index(drop=True)
     
-size_results.to_csv("results/goal_accuracies.csv", index=False)
-top.to_csv("results/top_goal_accuracy.csv", index=False)
+    size_results.to_csv("results/goal_accuracies.csv", index=False)
+    top.to_csv("results/top_goal_accuracy.csv", index=False)
