@@ -11,7 +11,7 @@ import os
 from datetime import datetime
 from collections import OrderedDict
 
-os.chdir("/content/Federated-Learning-Sparsification/")
+os.chdir("/content/fedavg/")
 def main(dataset_name, femnist_location, optimiser, learning_rate, num_clients):
     if dataset_name == "femnist":
         model = models.create_model(dataset_name, "CNN500k")

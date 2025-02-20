@@ -20,7 +20,7 @@ import utils
 import models
 import data
 import argparse
-os.chdir("/content/Federated-Learning-Sparsification/")
+os.chdir("/content/fedavg/")
 class SparsifyClient(fl.client.Client):
     def __init__(self, 
                  cid, 
