@@ -228,6 +228,8 @@ if __name__ == "__main__":
     parser.add_argument("--epochs", default=1, type=int)
     parser.add_argument("--learning_rate", default=0.1, type=float)
     parser.add_argument("--regularisation", default=0, type=float)
+    parser.add_argument("--dirichlet_alpha", type=float, default=None, help="Dirichlet alpha for non-IID partitioning. Set None for IID.")
+
     args = parser.parse_args()
     
     if args.dataset_name=="femnist":
@@ -242,7 +244,7 @@ if __name__ == "__main__":
         frac_eval_clients = 0.3
     elif args.dataset_name=="brain":
         model=models.create_model("brain", "CNN500k")
-        train_loaders, test_loaders = data.brain_data(path_to_data_folder="/content/fedavg/brain", num_clients=10)
+        train_loaders, test_loaders = data.brain_data(path_to_data_folder="/content/fedavg/brain", num_clients=10,dirichlet_alpha=args.dirichlet_alpha)
         frac_clients = 0.3
         frac_eval_clients = 0.3
     
@@ -321,6 +323,7 @@ if __name__ == "__main__":
                             "learning_rate": [args.learning_rate], 
                             "regularisation": [args.regularisation],
                             "losses": [history.losses_distributed],
+                            
                             "accs": [history.metrics_distributed["accuracy"]],
                            })
     if os.path.isfile("results/results.csv"): 
