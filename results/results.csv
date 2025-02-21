@@ -1,1 +1,1 @@
-time_taken,dataset,frac_clients,num_clients,num_rounds,approach,epochs,sparsify_by,keep_first_last,learning_rate,regularisation,losses,accs,bytes_size,spars_label,alpha
+time_taken,dataset,frac_clients,num_clients,num_rounds,approach,epochs,sparsify_by,keep_first_last,learning_rate,regularisation,losses,accs,bytes_size,spars_label
