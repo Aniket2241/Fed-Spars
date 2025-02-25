@@ -13,26 +13,21 @@ from collections import OrderedDict
 
 os.chdir("/content/fedavg/")
 def main(dataset_name, femnist_location, optimiser, learning_rate, num_clients):
-    if dataset_name == "femnist":
-        model = models.create_model(dataset_name, "CNN500k")
-        num_rounds = 30
-        client_frac = 0.25
-        min_clients = 12
-        trainloaders, testloaders = data.femnist_data(femnist_location)
+    
 
-    elif dataset_name == "cifar":
-        model = models.create_model(dataset_name, "CNN500k")
-        num_rounds = 180
-        client_frac = 0.3
-        min_clients = 15
-        trainloaders, testloaders = data.cifar_data()
-
-    elif dataset_name == "brain":
-        model = models.create_model(dataset_name, "resnet18")
+    if dataset_name == "brain":
+        model = models.create_model("brain", "CNN500k")
         num_rounds = 30  # Adjust based on your needs
         client_frac = 1.0  # Since you might have fewer clients
         min_clients = num_clients  # Use all clients if few
-        trainloaders, testloaders = data.brain_data(path_to_data_folder="brain_dataset", num_clients=num_clients)
+        trainloaders, testloaders = data.brain_data(path_to_data_folder="./brain", num_clients=num_clients)
+    elif dataset_name=="alzheimer":
+        model=models.create_model("alzheimer","CNN500k")
+        num_rounds=200
+        client_frac=1.0
+        min_clients=num_clients
+        trainloaders, testloaders = data.brain_data(path_to_data_folder="./AugmentedAlzheimerDataset", num_clients=num_clients)
+
 
     else:
         raise ValueError("Unsupported dataset. Choose from 'femnist', 'cifar', 'brain'.")
