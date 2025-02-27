@@ -5,6 +5,16 @@ import random
 import numpy as np
 import os
 import shutil
+import shutil
+import os
+
+def clean_hidden_folders(path):
+    for root, dirs, files in os.walk(path, topdown=True):
+        for dir_name in dirs:
+            if dir_name.startswith('.'):
+                shutil.rmtree(os.path.join(root, dir_name), ignore_errors=True)
+
+clean_hidden_folders("./AugmentedIQ-OTHNCCDlungcancerdataset")
 
 
 def prepare_dataset(path_to_data_folder, train_ratio=0.8, seed=42):
@@ -67,7 +77,7 @@ def load_federated_data(
     """
 
 
-    if dataset_name in ["alzheimer", "brain"]:
+    if dataset_name in ["alzheimer", "brain","lung"]:
         prepare_dataset(path_to_data_folder)
 
     transform = transforms.Compose([

@@ -48,22 +48,29 @@ class SparsifyClient(fl.client.Client):
         self.model_info = model_info
 
     def get_parameters(self, ins) -> GetParametersRes:
+        # get the current model parameters
         model_parameters = [value.cpu().numpy() for value in self.model.state_dict().values()]
+        # convert the current model parameters to bytes
         bytes_parameters = utils.values_to_bytes_list(model_parameters)
+        # return the current model parameters as bytes
         return GetParametersRes(status=Status(code=Code.OK, message="Success"),
                                 parameters=bytes_parameters)
     
     def fit(self, ins) -> FitRes:
+        # recieve the model parameters from the global model, apply to the local client model
         global_model_parameters = utils.bytes_to_values_list(ins.parameters.tensors)
         global_state_dict = zip(self.model.state_dict().keys(), global_model_parameters)
+        # FROM_NUMPY HERE IS POTENTIALLY CAUSING A BUG
         global_state_dict = OrderedDict({key: torch.from_numpy(value) for key, value in global_state_dict})
         self.model.load_state_dict(global_state_dict, strict=True)
+        # train the model using local data
         utils.train(model=self.model, 
                     train_loader=self.train_loader, 
                     optimiser="SGD",  
                     lr=self.learning_rate, 
                     epochs=self.epochs,
                     weight_decay=self.regularisation)
+        # flatten the parameters, then find the difference between the original and updated parameters
         flat_updated_parameters = np.concatenate([layer.cpu().numpy().ravel() for layer in self.model.state_dict().values()])
         flat_global_parameters = np.concatenate([layer.ravel() for layer in global_model_parameters])
         flat_delta_parameters = np.subtract(flat_updated_parameters, flat_global_parameters)
@@ -76,7 +83,7 @@ class SparsifyClient(fl.client.Client):
                           metrics={})
         
         ## sparsify the parameters using one of three approaches: topk, threshold or random
-        if self.approach=="topk": 
+        if self.approach=="topk": # find the indices of the top 10% largest delta parameters
             if self.keep_first_last:
                 middle_flat_delta_parameters = flat_delta_parameters[self.model_info["indices_first_layer"][-1]+1:self.model_info["indices_last_layer"][0]]
                 spars_indices = np.argpartition(np.abs(middle_flat_delta_parameters), -self.model_info["num_to_spars"])[-self.model_info["num_to_spars"]:]
@@ -85,7 +92,7 @@ class SparsifyClient(fl.client.Client):
             else:
                 spars_indices = np.argpartition(np.abs(flat_delta_parameters), -self.model_info["num_to_spars"])[-self.model_info["num_to_spars"]:]
 
-        elif self.approach=="threshold":
+        elif self.approach=="threshold": # find the indices of the delta parameters larger than a threshold
             normalisation_constant = np.linalg.norm(np.abs(flat_delta_parameters), ord=2)
             if self.keep_first_last:
                 middle_flat_delta_parameters = flat_delta_parameters[self.model_info["indices_first_layer"][-1]+1:self.model_info["indices_last_layer"][0]]
@@ -104,7 +111,9 @@ class SparsifyClient(fl.client.Client):
             else:
                 spars_indices = np.array(random.sample(range(self.model_info["num_model_params"]), self.model_info["num_to_spars"]))
 
+        # create a numpy array containing the sparsified index positions and parameter values
         coo_delta_parameters = np.array([(index, flat_delta_parameters[index]) for index in spars_indices], dtype=np.float32)
+        # send the sparsified updated parameters to the server
         coo_delta_bytes = utils.values_to_bytes(coo_delta_parameters)
         return FitRes(status=Status(code=Code.OK, message="Success"),
                       parameters=coo_delta_bytes,
@@ -112,11 +121,14 @@ class SparsifyClient(fl.client.Client):
                       metrics={})
 
     def evaluate(self, ins) -> EvaluateRes:
+        # recieve the global model parameters from the server
         global_model_parameters = utils.bytes_to_values_list(ins.parameters.tensors)
         global_state_dict = zip(self.model.state_dict().keys(), global_model_parameters)
         global_state_dict = OrderedDict({key: torch.from_numpy(value) for key, value in global_state_dict})
         self.model.load_state_dict(global_state_dict, strict=True)
+        # evaluate the global model on the local test dataset
         test_loss, test_accuracy = utils.test(self.model, self.test_loader)
+        # return the loss and accuracy of the global model on the local test dataset
         return EvaluateRes(status=Status(code=Code.OK, message="Success"),
                            loss=float(test_loss),
                            num_examples=len(self.test_loader),
@@ -147,13 +159,16 @@ class SparsifyStrategy(fl.server.strategy.Strategy):
         self.approach = approach
         
     def initialize_parameters(self, client_manager):
+        # the initial parameters of the starting model are provided by the initial model
         bytes_parameters = utils.values_to_bytes_list(self.model_parameters)
         return bytes_parameters
 
     def configure_fit(self, server_round, parameters, client_manager):
+        # sample the clients
         random.seed(server_round)
         clients = client_manager.sample(num_clients=self.num_clients, 
                                         min_num_clients=self.num_clients)
+        # return the sampled clients
         fit_ins = FitIns(parameters, {})
         return [(client, fit_ins) for client in clients]
 
@@ -162,28 +177,33 @@ class SparsifyStrategy(fl.server.strategy.Strategy):
         if self.approach=="none":
             self.model_flat_parameters += np.mean([utils.bytes_to_values(fit_res.parameters.tensors) for _, fit_res in results], axis=0)
         else:
+            # reading in all of the client parameters as numpy arrays and putting them in the parameter dictionary
             client_coo_parameters = defaultdict(list)
             for _, fit_res in results:
                 client_coo_array = utils.bytes_to_values(fit_res.parameters.tensors)
                 for row in client_coo_array:
                     client_coo_parameters[row[0]].append(row[1])
+            # find the average of all of the parameters and update the global model
             for index in client_coo_parameters:
                 self.model_flat_parameters[int(index)] += np.mean(client_coo_parameters[index])
                 
+        # reshaping the parameters to array format
         shaped_model_parameters = [self.model_flat_parameters[self.cum_num_params[i]:self.cum_num_params[i+1]].reshape(self.layer_shapes[i]) for i in range(len(self.layer_num_params))]
+        # send the new model parameters to the clients
         global_model_bytes = utils.values_to_bytes_list(shaped_model_parameters)
         return global_model_bytes, {} 
 
     def configure_evaluate(self, server_round, parameters, client_manager):
+        # sample the clients for evaluation
         random.seed(server_round)
         clients = client_manager.sample(num_clients=self.num_eval_clients, 
                                         min_num_clients=self.num_eval_clients)
-        
+        # return the sampled clients
         evaluate_ins = EvaluateIns(parameters, {})
         return [(client, evaluate_ins) for client in clients]
 
     def aggregate_evaluate(self, server_round, results,failures):
-        
+        # find the average loss and accuracy, weighted by the client's number of data points
         weighted_metrics = [(evaluate_res.num_examples,
                              evaluate_res.num_examples * evaluate_res.loss, 
                              evaluate_res.num_examples * evaluate_res.metrics["accuracy"]) for _, evaluate_res in results]
@@ -194,7 +214,7 @@ class SparsifyStrategy(fl.server.strategy.Strategy):
         return aggregated_loss, aggregated_metrics
 
     def evaluate(self, server_round, parameters):
-       
+        # no evaluation on the global model
         return None
 
 if __name__ == "__main__":
@@ -217,14 +237,19 @@ if __name__ == "__main__":
         model=models.create_model("brain", "CNN500k")
         train_loaders, test_loaders = data.load_federated_data(dataset_name="brain",path_to_data_folder="./brain",num_clients=3,dirichlet_alpha=args.dirichlet_alpha)
         frac_clients = 1.0
-        frac_eval_clients = 0.3
+        frac_eval_clients = 1.0
     elif args.dataset_name=="alzheimer":
         model=models.create_model("alzheimer", "CNN500k")
         train_loaders, test_loaders = data.load_federated_data(dataset_name="alzheimer",path_to_data_folder="./AugmentedAlzheimerDataset",num_clients=3,dirichlet_alpha=args.dirichlet_alpha)
         frac_clients = 1.0
-        frac_eval_clients = 0.3
+        frac_eval_clients = 1.0
+    elif args.dataset_name=="lung":
+        model=models.create_model("alzheimer", "CNN500k")
+        train_loaders, test_loaders = data.load_federated_data(dataset_name="lung",path_to_data_folder="./AugmentedIQ-OTHNCCDlungcancerdataset",num_clients=3,dirichlet_alpha=args.dirichlet_alpha)
+        frac_clients = 1.0
+        frac_eval_clients = 1.0
         
- 
+    # pre-compute information to provide to the server (strategy)
     num_clients = int(frac_clients * len(train_loaders))
     num_eval_clients = int(frac_eval_clients * len(train_loaders))
     model_flat_parameters = np.concatenate([layer.cpu().numpy().ravel() for layer in model.state_dict().values()])
@@ -235,8 +260,9 @@ if __name__ == "__main__":
     num_model_params = sum(layer_num_params)
     empty_deltas_dict = {key: np.nan for key in range(num_model_params)}
     
+    # pre-compute information about the model once to provide to the clients
     model_info = {"num_model_params":num_model_params,
-                  "num_first_layer":layer_num_params[0]+layer_num_params[1], 
+                  "num_first_layer":layer_num_params[0]+layer_num_params[1], # weights and biases
                   "num_last_layer":layer_num_params[-1],
                   "indices_first_layer":list(range(layer_num_params[0] + layer_num_params[1])),
                   "indices_last_layer":list(range(num_model_params - layer_num_params[-1], num_model_params))}
@@ -247,7 +273,7 @@ if __name__ == "__main__":
         
     client_resources = {"num_gpus": 1, "num_cpus": 1}
     
-    
+    # define the custom clients
     def client_fn(cid):
         train_loader = train_loaders[int(cid)]
         test_loader = test_loaders[int(cid)]
@@ -275,7 +301,7 @@ if __name__ == "__main__":
                                 cum_num_params=cum_num_params,
                                 approach=args.approach)
 
-    
+    # begin the simulation
     start = datetime.now()
     history = fl.simulation.start_simulation(
         client_fn=client_fn,

@@ -8,8 +8,15 @@ def create_model(dataset_name, model_name):
     Input: Dataset name: can be 'femnist', 'cifar', or 'brain'
     Input: Model name: can be 'resnet18', 'CNNRes4M3M', 'CNNRes3M2M', or 'CNN500k'
     """
-    
-    if dataset_name == "brain":
+    if dataset_name == "femnist":
+        num_channels = 1
+        image_size = 28
+        num_classes = 62
+    elif dataset_name == "cifar":
+        num_channels = 3
+        image_size = 32
+        num_classes = 10
+    elif dataset_name == "brain":
         num_channels = 3
         image_size = 128  # Assuming your brain images are resized to 150x150
         num_classes = 3   # Tumor vs No Tumor
@@ -17,6 +24,11 @@ def create_model(dataset_name, model_name):
         num_channels = 3
         image_size=128
         num_classes=4
+    elif dataset_name=="lung":
+        num_channels = 3
+        image_size=128
+        num_classes=3
+        
     else:
         return None
 
