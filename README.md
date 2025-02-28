@@ -1,10 +1,10 @@
-## Fed-Spars
+## FL-TKS
  
-Fed-Spars is a federated learning framework designed to improve communication efficiency by sparsifying client-uploaded model updates, thereby significantly reducing 
+ FL-TKS is a federated learning framework designed to improve communication efficiency by sparsifying client-uploaded model updates, thereby significantly reducing 
 communication costs in federated learning settings.
 
 ## Sparsification Support
-ed-Spars supports the following sparsification strategies for communication-efficient model updates:
+FL-TKS supports the following sparsification strategies for communication-efficient model updates:
 
 Top-k Sparsification: Selects the top k% of model parameters with the largest absolute changes after local training.
 Random Sparsification: Randomly selects k% of the model parameters for upload.
@@ -35,10 +35,16 @@ The following settings were used for the experiments:
 
 ## Sparsification Levels
 The following sparsification levels (k) were tested in the Top-k sparsification experiments:
-*0.1
-*0.2
-*0.3
-*0.4
+* 0.1
+* 0.2
+* 0.3
+* 0.4
+
+## Authors
+- **[Aniket Bhardwaj](https://github.com/Aniket2241)** (First Author)
+- **[Dr.Gousia Habib](https://github.com/gousiya26-I)** (Second Author)
+- **[Ritvik Sharma](https://github.com/Ritvik0025)** (Third Author)
+
 
 **Baseline:**
 Federated Averaging [(https://arxiv.org/abs/1602.05629)](https://arxiv.org/abs/1602.05629) using the same set-up as above.
